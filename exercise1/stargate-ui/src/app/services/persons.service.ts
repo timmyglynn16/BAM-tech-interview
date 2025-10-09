@@ -28,8 +28,8 @@ export interface UpdatePersonRequest {
 export class PersonsService {
   constructor(private apiService: ApiService) { }
 
-  getAllPersons(): Observable<ApiResponse<{ people: Person[] }>> {
-    return this.apiService.get<{ people: Person[] }>('person');
+  getAllPersons(): Observable<ApiResponse<Person[]>> {
+    return this.apiService.get<Person[]>('person');
   }
 
   getPersonByName(name: string): Observable<ApiResponse<Person>> {

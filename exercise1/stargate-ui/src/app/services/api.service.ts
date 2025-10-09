@@ -9,6 +9,7 @@ export interface ApiResponse<T> {
   responseCode: number;
   data?: T;
   people?: T;
+  astronautDuties?: T;
 }
 
 @Injectable({
@@ -52,8 +53,14 @@ export class ApiService {
       if (error.error && error.error.message) {
         errorMessage = error.error.message;
       }
+      
+      // Check for CORS errors
+      if (error.status === 0) {
+        errorMessage = 'CORS Error: Unable to connect to the API. Please check if the backend is running and CORS is configured.';
+      }
     }
-    console.error(errorMessage);
+    console.error('API Error:', error);
+    console.error('Error Message:', errorMessage);
     return throwError(() => new Error(errorMessage));
   }
 }

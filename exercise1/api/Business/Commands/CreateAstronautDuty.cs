@@ -25,6 +25,8 @@ namespace StargateAPI.Business.Commands
 
         [Required(ErrorMessage = "DutyStartDate is required")]
         public DateTime DutyStartDate { get; set; }
+
+        public DateTime? DutyEndDate { get; set; }
     }
 
     public class CreateAstronautDutyPreProcessor : IRequestPreProcessor<CreateAstronautDuty>
@@ -42,9 +44,8 @@ namespace StargateAPI.Business.Commands
 
             if (person is null) throw new BadHttpRequestException("Person not found");
 
-            var verifyNoPreviousDuty = _context.AstronautDuties.FirstOrDefault(z => z.PersonId == person.Id && z.DutyEndDate == null);
-
-            if (verifyNoPreviousDuty is not null) throw new BadHttpRequestException("Person already has a current duty");
+            // Removed the check that prevented creating duties for people with existing active duties
+            // Now we allow this and automatically end the old duty in the handler
 
             return Task.CompletedTask;
         }
@@ -76,8 +77,37 @@ namespace StargateAPI.Business.Commands
 
             if (astronautDuty != null)
             {
-                astronautDuty.DutyEndDate = request.DutyStartDate.AddDays(-1).Date;
-                _context.AstronautDuties.Update(astronautDuty);
+                // Rule 5: Previous Duty End Date is set to the day before the New Astronaut Duty Start Date
+                DateTime newDutyStartDate;
+                if (request.DutyTitle == "RETIRED" && request.DutyEndDate.HasValue)
+                {
+                    // For retirement, the new duty start date is the retirement date
+                    newDutyStartDate = request.DutyEndDate.Value.Date;
+                }
+                else
+                {
+                    // For regular duties, use the provided start date
+                    newDutyStartDate = request.DutyStartDate.Date;
+                }
+                
+                // Rule 5: Set previous duty end date to one day before new duty start date
+                DateTime previousDutyEndDate = newDutyStartDate.AddDays(-1).Date;
+                
+                try
+                {
+                    // Safety check to ensure the date is valid
+                    if (previousDutyEndDate < DateTime.MinValue || previousDutyEndDate > DateTime.MaxValue)
+                    {
+                        throw new InvalidOperationException($"Calculated end date {previousDutyEndDate} is outside valid DateTime range");
+                    }
+                    
+                    astronautDuty.DutyEndDate = previousDutyEndDate;
+                    _context.AstronautDuties.Update(astronautDuty);
+                }
+                catch (ArgumentOutOfRangeException ex)
+                {
+                    throw new InvalidOperationException($"Cannot calculate end date for duty. Existing duty start: {astronautDuty.DutyStartDate}, New duty start: {newDutyStartDate}, Error: {ex.Message}");
+                }
             }
 
             var newAstronautDuty = new AstronautDuty()
@@ -85,8 +115,10 @@ namespace StargateAPI.Business.Commands
                 PersonId = person.Id,
                 Rank = request.Rank,
                 DutyTitle = request.DutyTitle,
-                DutyStartDate = request.DutyStartDate.Date,
-                DutyEndDate = null
+                DutyStartDate = request.DutyTitle == "RETIRED" && request.DutyEndDate.HasValue 
+                    ? request.DutyEndDate.Value.Date 
+                    : request.DutyStartDate.Date,
+                DutyEndDate = request.DutyEndDate?.Date
             };
 
             await _context.AstronautDuties.AddAsync(newAstronautDuty);
@@ -99,9 +131,9 @@ namespace StargateAPI.Business.Commands
                 astronautDetail.CurrentDutyTitle = request.DutyTitle;
                 astronautDetail.CurrentRank = request.Rank;
                 astronautDetail.CareerStartDate = request.DutyStartDate.Date;
-                if (request.DutyTitle == "RETIRED")
+                if (request.DutyTitle == "RETIRED" && request.DutyEndDate.HasValue)
                 {
-                    astronautDetail.CareerEndDate = request.DutyStartDate.Date;
+                    astronautDetail.CareerEndDate = request.DutyEndDate.Value.Date;
                 }
 
                 await _context.AstronautDetails.AddAsync(astronautDetail);
@@ -110,9 +142,9 @@ namespace StargateAPI.Business.Commands
             {
                 astronautDetail.CurrentDutyTitle = request.DutyTitle;
                 astronautDetail.CurrentRank = request.Rank;
-                if (request.DutyTitle == "RETIRED")
+                if (request.DutyTitle == "RETIRED" && request.DutyEndDate.HasValue)
                 {
-                    astronautDetail.CareerEndDate = request.DutyStartDate.AddDays(-1).Date;
+                    astronautDetail.CareerEndDate = request.DutyEndDate.Value.Date;
                 }
                 _context.AstronautDetails.Update(astronautDetail);
             }

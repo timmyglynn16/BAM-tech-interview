@@ -22,7 +22,7 @@ import { MatFormFieldModule } from '@angular/material/form-field';
     </mat-dialog-content>
     <mat-dialog-actions align="end">
       <button mat-button (click)="onCancel()">Cancel</button>
-      <button mat-raised-button color="primary" (click)="onCreate()" [disabled]="!personName?.trim()">
+      <button mat-raised-button color="primary" (click)="onCreate()" [disabled]="!personName.trim()">
         Create
       </button>
     </mat-dialog-actions>

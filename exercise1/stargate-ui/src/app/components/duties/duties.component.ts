@@ -1,5 +1,6 @@
-import { Component } from '@angular/core';
+import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
 import { MatTableModule } from '@angular/material/table';
 import { MatCardModule } from '@angular/material/card';
 import { MatButtonModule } from '@angular/material/button';
@@ -7,41 +8,48 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatChipsModule } from '@angular/material/chips';
 import { MatInputModule } from '@angular/material/input';
 import { MatFormFieldModule } from '@angular/material/form-field';
-import { MatSelectModule } from '@angular/material/select';
+import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { MatDialog } from '@angular/material/dialog';
+import { MatSnackBarModule, MatSnackBar } from '@angular/material/snack-bar';
+import { DutiesService, AstronautDutyWithPerson, CreateDutyRequest } from '../../services/duties.service';
+import { CreateDutyDialogComponent } from './create-duty-dialog.component';
+
+interface DutyWithPerson {
+  id: number;
+  personId: number;
+  personName: string;
+  rank: string;
+  dutyTitle: string;
+  dutyStartDate: string;
+  dutyEndDate?: string | null;
+  isActive: boolean;
+  isCompleted: boolean;
+}
 
 @Component({
   selector: 'app-duties',
   standalone: true,
   imports: [
-    CommonModule, MatTableModule, MatCardModule, MatButtonModule, 
-    MatIconModule, MatChipsModule, MatInputModule, MatFormFieldModule, MatSelectModule
+    CommonModule, FormsModule, MatTableModule, MatCardModule, MatButtonModule,
+    MatIconModule, MatChipsModule, MatInputModule, MatFormFieldModule, MatProgressSpinnerModule,
+    MatSnackBarModule
   ],
   template: `
     <div class="header">
       <h1>Duty Management</h1>
-      <button mat-raised-button color="primary">
+      <button mat-raised-button color="primary" (click)="openCreateDutyDialog()">
         <mat-icon>add</mat-icon>
         Assign Duty
       </button>
     </div>
 
-    <div class="grid grid-4 mb-20">
+    <div class="grid grid-2 mb-20">
       <div class="card stat-card">
         <div class="stat">
           <mat-icon>assignment</mat-icon>
           <div>
             <h2>{{ duties.length }}</h2>
             <p>Total Duties</p>
-          </div>
-        </div>
-      </div>
-      
-      <div class="card stat-card">
-        <div class="stat">
-          <mat-icon>schedule</mat-icon>
-          <div>
-            <h2>{{ getPendingCount() }}</h2>
-            <p>Pending</p>
           </div>
         </div>
       </div>
@@ -55,50 +63,27 @@ import { MatSelectModule } from '@angular/material/select';
           </div>
         </div>
       </div>
-      
-      <div class="card stat-card">
-        <div class="stat">
-          <mat-icon>warning</mat-icon>
-          <div>
-            <h2>{{ getOverdueCount() }}</h2>
-            <p>Overdue</p>
-          </div>
-        </div>
-      </div>
     </div>
 
     <div class="card">
-      <div class="filters">
-        <mat-form-field appearance="outline" class="filter-field">
-          <mat-label>Search duties</mat-label>
-          <input matInput placeholder="Duty title or description">
-          <mat-icon matSuffix>search</mat-icon>
-        </mat-form-field>
-        
-        <mat-form-field appearance="outline" class="filter-field">
-          <mat-label>Status</mat-label>
-          <mat-select>
-            <mat-option value="">All Statuses</mat-option>
-            <mat-option value="pending">Pending</mat-option>
-            <mat-option value="progress">In Progress</mat-option>
-            <mat-option value="completed">Completed</mat-option>
-            <mat-option value="overdue">Overdue</mat-option>
-          </mat-select>
-        </mat-form-field>
-        
-        <mat-form-field appearance="outline" class="filter-field">
-          <mat-label>Priority</mat-label>
-          <mat-select>
-            <mat-option value="">All Priorities</mat-option>
-            <mat-option value="critical">Critical</mat-option>
-            <mat-option value="high">High</mat-option>
-            <mat-option value="medium">Medium</mat-option>
-            <mat-option value="low">Low</mat-option>
-          </mat-select>
-        </mat-form-field>
+      <mat-form-field appearance="outline" class="search-field">
+        <mat-label>Search duties</mat-label>
+        <input matInput placeholder="Duty title or person name" [(ngModel)]="searchTerm" (input)="filterDuties()">
+        <mat-icon matSuffix>search</mat-icon>
+      </mat-form-field>
+
+      <div *ngIf="loading" class="loading-container">
+        <mat-spinner></mat-spinner>
+        <p>Loading duties...</p>
       </div>
 
-      <table mat-table [dataSource]="duties" class="duties-table">
+      <div *ngIf="error" class="error-container">
+        <mat-icon color="warn">error</mat-icon>
+        <p>{{ error }}</p>
+        <button mat-button (click)="loadDuties()">Retry</button>
+      </div>
+
+      <table mat-table [dataSource]="filteredDuties" class="duties-table" *ngIf="!loading && !error">
         <ng-container matColumnDef="dutyTitle">
           <th mat-header-cell *matHeaderCellDef>Duty Title</th>
           <td mat-cell *matCellDef="let duty">
@@ -151,14 +136,16 @@ import { MatSelectModule } from '@angular/material/select';
           <th mat-header-cell *matHeaderCellDef>Actions</th>
           <td mat-cell *matCellDef="let duty">
             <button mat-icon-button>
-              <mat-icon>more_vert</mat-icon>
+              <mat-icon>edit</mat-icon>
+            </button>
+            <button mat-icon-button>
+              <mat-icon>delete</mat-icon>
             </button>
           </td>
         </ng-container>
 
         <tr mat-header-row *matHeaderRowDef="displayedColumns" class="header-row"></tr>
-        <tr mat-row *matRowDef="let row; columns: displayedColumns;" 
-            [class.overdue-row]="isOverdue(row.dutyEndDate)" class="data-row"></tr>
+        <tr mat-row *matRowDef="let row; columns: displayedColumns;" class="data-row" [class.overdue-row]="isOverdue(row.dutyEndDate)"></tr>
       </table>
     </div>
   `,
@@ -192,16 +179,9 @@ import { MatSelectModule } from '@angular/material/select';
       opacity: 0.9;
     }
     
-    .filters {
-      display: flex;
-      gap: 16px;
+    .search-field {
+      width: 100%;
       margin-bottom: 20px;
-      flex-wrap: wrap;
-    }
-    
-    .filter-field {
-      flex: 1;
-      min-width: 200px;
     }
     
     .duties-table {
@@ -264,87 +244,145 @@ import { MatSelectModule } from '@angular/material/select';
       background-color: #ffcdd2;
     }
     
+    .loading-container, .error-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 16px;
+      padding: 40px;
+      text-align: center;
+    }
+    
+    .error-container {
+      color: #d32f2f;
+    }
+    
     @media (max-width: 768px) {
       .header {
         flex-direction: column;
         gap: 15px;
         align-items: stretch;
       }
-      
-      .filters {
-        flex-direction: column;
-      }
-      
-      .filter-field {
-        min-width: unset;
-      }
     }
   `]
 })
-export class DutiesComponent {
+export class DutiesComponent implements OnInit {
   displayedColumns: string[] = ['dutyTitle', 'personName', 'rank', 'dutyStartDate', 'dutyEndDate', 'actions'];
   
-  duties = [
-    {
-      id: 1,
-      personId: 1,
-      personName: 'Commander Sarah Chen',
-      rank: 'Commander',
-      dutyTitle: 'Navigation System Calibration',
-      dutyStartDate: new Date('2024-02-01'),
-      dutyEndDate: new Date('2024-02-15')
-    },
-    {
-      id: 2,
-      personId: 2,
-      personName: 'Lt. Marcus Rodriguez',
-      rank: 'Lieutenant',
-      dutyTitle: 'Life Support System Check',
-      dutyStartDate: new Date('2024-02-05'),
-      dutyEndDate: new Date('2024-02-10')
-    },
-    {
-      id: 3,
-      personId: 3,
-      personName: 'Dr. Elena Volkov',
-      rank: 'Doctor',
-      dutyTitle: 'Medical Equipment Inventory',
-      dutyStartDate: new Date('2024-01-30'),
-      dutyEndDate: new Date('2024-02-05')
-    },
-    {
-      id: 4,
-      personId: 5,
-      personName: 'Lt. Commander Aisha Patel',
-      rank: 'Lt. Commander',
-      dutyTitle: 'Communication Protocol Review',
-      dutyStartDate: new Date('2024-01-15'),
-      dutyEndDate: new Date('2024-01-30')
-    },
-    {
-      id: 5,
-      personId: 4,
-      personName: 'Captain James Mitchell',
-      rank: 'Captain',
-      dutyTitle: 'Fuel System Inspection',
-      dutyStartDate: new Date('2024-02-10'),
-      dutyEndDate: new Date('2024-02-20')
-    }
-  ];
+  duties: DutyWithPerson[] = [];
+  filteredDuties: DutyWithPerson[] = [];
+  loading = false;
+  error: string | null = null;
+  searchTerm = '';
 
-  getPendingCount(): number {
-    return this.duties.filter(duty => duty.dutyEndDate && duty.dutyEndDate > new Date()).length;
+  constructor(
+    private dutiesService: DutiesService,
+    private snackBar: MatSnackBar,
+    private dialog: MatDialog
+  ) {}
+
+  ngOnInit() {
+    this.loadDuties();
+  }
+
+  loadDuties() {
+    this.loading = true;
+    this.error = null;
+    
+    this.dutiesService.getAllDuties().subscribe({
+      next: (response) => {
+        console.log('All duties response:', response);
+        this.loading = false;
+        
+        if (response.success && response.astronautDuties) {
+          const now = new Date();
+          this.duties = response.astronautDuties.map((duty: AstronautDutyWithPerson) => {
+            const endDate = duty.dutyEndDate ? new Date(duty.dutyEndDate) : null;
+            const isCompleted = endDate ? endDate < now : false;
+            const isActive = !endDate || endDate >= now;
+
+            return {
+              id: duty.id,
+              personId: duty.personId,
+              personName: duty.personName,
+              rank: duty.rank,
+              dutyTitle: duty.dutyTitle,
+              dutyStartDate: duty.dutyStartDate,
+              dutyEndDate: duty.dutyEndDate,
+              isActive,
+              isCompleted
+            };
+          });
+          
+          this.filteredDuties = [...this.duties];
+        } else {
+          this.error = response.message || 'Failed to load duties';
+        }
+      },
+      error: (err) => {
+        this.loading = false;
+        this.error = 'Failed to load duties. Please check if the API is running.';
+        console.error('Error loading duties:', err);
+      }
+    });
+  }
+
+  filterDuties() {
+    if (!this.searchTerm.trim()) {
+      this.filteredDuties = [...this.duties];
+    } else {
+      this.filteredDuties = this.duties.filter(duty =>
+        duty.dutyTitle.toLowerCase().includes(this.searchTerm.toLowerCase()) ||
+        duty.personName.toLowerCase().includes(this.searchTerm.toLowerCase()) ||
+        duty.rank.toLowerCase().includes(this.searchTerm.toLowerCase())
+      );
+    }
   }
 
   getCompletedCount(): number {
-    return this.duties.filter(duty => duty.dutyEndDate && duty.dutyEndDate <= new Date()).length;
+    return this.duties.filter(duty => duty.isCompleted).length;
   }
 
-  getOverdueCount(): number {
-    return this.duties.filter(duty => this.isOverdue(duty.dutyEndDate)).length;
+  isOverdue(endDate?: string | null): boolean {
+    if (!endDate) return false;
+    return new Date(endDate) < new Date();
   }
 
-  isOverdue(endDate: Date): boolean {
-    return endDate < new Date();
+  // Create Duty Dialog Methods
+  openCreateDutyDialog() {
+    const dialogRef = this.dialog.open(CreateDutyDialogComponent, {
+      width: '500px',
+      data: {}
+    });
+
+    dialogRef.afterClosed().subscribe(result => {
+      if (result && result.name) {
+        this.createDuty(result);
+      }
+    });
+  }
+
+  createDuty(dutyData: any) {
+    const request: CreateDutyRequest = {
+      name: dutyData.name,
+      rank: dutyData.rank,
+      dutyTitle: dutyData.dutyTitle,
+      dutyStartDate: dutyData.dutyStartDate
+    };
+
+    this.dutiesService.createDuty(request).subscribe({
+      next: (response) => {
+        if (response.success) {
+          this.snackBar.open('Duty assigned successfully!', 'Close', { duration: 3000 });
+          this.loadDuties(); // Refresh the list
+        } else {
+          this.snackBar.open(response.message || 'Failed to assign duty', 'Close', { duration: 3000 });
+        }
+      },
+      error: (err) => {
+        this.snackBar.open('Error assigning duty: ' + err.message, 'Close', { duration: 3000 });
+        console.error('Error assigning duty:', err);
+      }
+    });
   }
 }

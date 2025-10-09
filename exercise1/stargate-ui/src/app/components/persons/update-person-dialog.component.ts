@@ -23,7 +23,7 @@ import { Person } from '../../services/persons.service';
     </mat-dialog-content>
     <mat-dialog-actions align="end">
       <button mat-button (click)="onCancel()">Cancel</button>
-      <button mat-raised-button color="primary" (click)="onUpdate()" [disabled]="!personName?.trim()">
+      <button mat-raised-button color="primary" (click)="onUpdate()" [disabled]="!personName.trim()">
         Update
       </button>
     </mat-dialog-actions>
