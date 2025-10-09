@@ -4,11 +4,15 @@ import { MatCardModule } from '@angular/material/card';
 import { MatIconModule } from '@angular/material/icon';
 import { MatButtonModule } from '@angular/material/button';
 import { MatChipsModule } from '@angular/material/chips';
+import { MatDialog } from '@angular/material/dialog';
+import { MatSnackBarModule, MatSnackBar } from '@angular/material/snack-bar';
+import { PersonsService, CreatePersonRequest } from '../../services/persons.service';
+import { CreatePersonDialogComponent } from '../persons/create-person-dialog.component';
 
 @Component({
   selector: 'app-dashboard',
   standalone: true,
-  imports: [CommonModule, MatCardModule, MatIconModule, MatButtonModule, MatChipsModule],
+  imports: [CommonModule, MatCardModule, MatIconModule, MatButtonModule, MatChipsModule, MatSnackBarModule],
   template: `
     <h1>Mission Control Dashboard</h1>
     
@@ -60,7 +64,7 @@ import { MatChipsModule } from '@angular/material/chips';
       <div class="card">
         <h3>Quick Actions</h3>
         <div class="actions">
-          <button mat-raised-button color="primary" *ngFor="let action of actions">
+          <button mat-raised-button color="primary" *ngFor="let action of actions" (click)="handleAction(action)">
             <mat-icon>{{ action.icon }}</mat-icon>
             {{ action.label }}
           </button>
@@ -152,9 +156,64 @@ export class DashboardComponent {
   ];
 
   actions = [
-    { icon: 'add', label: 'Add Person' },
-    { icon: 'assignment', label: 'Assign Duty' },
-    { icon: 'assessment', label: 'Generate Report' }
+    { icon: 'add', label: 'Add Person', action: 'addPerson' },
+    { icon: 'assignment', label: 'Assign Duty', action: 'assignDuty' },
+    { icon: 'assessment', label: 'Generate Report', action: 'generateReport' }
   ];
 
+  constructor(
+    private dialog: MatDialog,
+    private snackBar: MatSnackBar,
+    private personsService: PersonsService
+  ) {}
+
+  handleAction(action: any) {
+    switch (action.action) {
+      case 'addPerson':
+        this.openCreatePersonDialog();
+        break;
+      case 'assignDuty':
+        this.snackBar.open('Assign Duty feature coming soon!', 'Close', { duration: 3000 });
+        break;
+      case 'generateReport':
+        this.snackBar.open('Generate Report feature coming soon!', 'Close', { duration: 3000 });
+        break;
+      default:
+        console.log('Unknown action:', action.action);
+    }
+  }
+
+  openCreatePersonDialog() {
+    const dialogRef = this.dialog.open(CreatePersonDialogComponent, {
+      width: '500px',
+      data: {}
+    });
+
+    dialogRef.afterClosed().subscribe(result => {
+      if (result && result.name) {
+        this.createPerson(result.name);
+      }
+    });
+  }
+
+  createPerson(name: string) {
+    const request: CreatePersonRequest = {
+      name: name,
+      role: 0 // Default to Personnel
+    };
+
+    this.personsService.createPerson(request).subscribe({
+      next: (response) => {
+        if (response.success) {
+          this.snackBar.open('Person created successfully!', 'Close', { duration: 3000 });
+        } else {
+          this.snackBar.open(response.message || 'Failed to create person', 'Close', { duration: 3000 });
+        }
+      },
+      error: (err) => {
+        this.snackBar.open('Error creating person: ' + err.message, 'Close', { duration: 3000 });
+        console.error('Error creating person:', err);
+      }
+    });
+  }
 }

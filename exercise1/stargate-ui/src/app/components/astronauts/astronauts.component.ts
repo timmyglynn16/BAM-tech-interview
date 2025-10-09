@@ -18,10 +18,6 @@ import { MatFormFieldModule } from '@angular/material/form-field';
   template: `
     <div class="header">
       <h1>Astronaut Management</h1>
-      <button mat-raised-button color="primary">
-        <mat-icon>add</mat-icon>
-        Add Astronaut
-      </button>
     </div>
 
     <div class="card">
