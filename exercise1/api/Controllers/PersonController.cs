@@ -1,4 +1,4 @@
-﻿using MediatR;
+﻿﻿using MediatR;
 using Microsoft.AspNetCore.Mvc;
 using StargateAPI.Business.Commands;
 using StargateAPI.Business.Queries;
@@ -73,24 +73,60 @@ namespace StargateAPI.Controllers
         }
 
         [HttpPost("")]
-        public async Task<IActionResult> CreatePerson([FromBody] string name)
+        public async Task<IActionResult> CreatePerson([FromBody] CreatePerson request)
         {
-            if (string.IsNullOrWhiteSpace(name))
+            if (request == null)
             {
                 return this.GetResponse(new BaseResponse()
                 {
-                    Message = "Name is required",
+                    Message = "Request body is required",
                     Success = false,
                     ResponseCode = (int)HttpStatusCode.BadRequest
                 });
             }
             try
             {
-                var result = await _mediator.Send(new CreatePerson()
+                var result = await _mediator.Send(request);
+                return this.GetResponse(result);
+            }
+            catch (Exception ex)
+            {
+                return this.GetResponse(new BaseResponse()
                 {
-                    Name = name
+                    Message = ex.Message,
+                    Success = false,
+                    ResponseCode = (int)HttpStatusCode.InternalServerError
                 });
+            }
+        }
 
+        [HttpPut("{name}")]
+        public async Task<IActionResult> UpdatePerson(string name, [FromBody] UpdatePerson request)
+        {
+            if (string.IsNullOrWhiteSpace(name))
+            {
+                return this.GetResponse(new BaseResponse()
+                {
+                    Message = "Name parameter is required",
+                    Success = false,
+                    ResponseCode = (int)HttpStatusCode.BadRequest
+                });
+            }
+            if (request == null)
+            {
+                return this.GetResponse(new BaseResponse()
+                {
+                    Message = "Request body is required",
+                    Success = false,
+                    ResponseCode = (int)HttpStatusCode.BadRequest
+                });
+            }
+            
+            request.Name = name;
+            
+            try
+            {
+                var result = await _mediator.Send(request);
                 return this.GetResponse(result);
             }
             catch (Exception ex)
