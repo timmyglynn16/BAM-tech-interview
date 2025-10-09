@@ -1,6 +1,8 @@
 using Microsoft.EntityFrameworkCore;
 using StargateAPI.Business.Commands;
 using StargateAPI.Business.Data;
+using StargateAPI.Business.Services;
+using StackExchange.Redis;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -32,6 +34,17 @@ builder.Services.AddMediatR(cfg =>
     cfg.AddRequestPreProcessor<UpdatePersonPreProcessor>();
     cfg.RegisterServicesFromAssemblies(typeof(Program).Assembly);
 });
+
+// Add Redis
+builder.Services.AddSingleton<IConnectionMultiplexer>(sp =>
+{
+    var configuration = ConfigurationOptions.Parse("localhost:6379");
+    return ConnectionMultiplexer.Connect(configuration);
+});
+
+// Add custom services
+builder.Services.AddScoped<RedisCacheService>();
+builder.Services.AddScoped<SeedDataGenerator>();
 
 var app = builder.Build();
 
