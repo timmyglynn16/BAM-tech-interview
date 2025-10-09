@@ -40,6 +40,29 @@ namespace StargateAPI.Controllers
             }
         }
 
+        [HttpGet("astronauts")]
+        public async Task<IActionResult> GetAstronauts()
+        {
+            try
+            {
+                var result = await _mediator.Send(new GetAstronauts()
+                {
+
+                });
+
+                return this.GetResponse(result);
+            }
+            catch (Exception ex)
+            {
+                return this.GetResponse(new BaseResponse()
+                {
+                    Message = ex.Message,
+                    Success = false,
+                    ResponseCode = (int)HttpStatusCode.InternalServerError
+                });
+            }
+        }
+
         [HttpGet("{name}")]
         public async Task<IActionResult> GetPersonByName(string name)
         {

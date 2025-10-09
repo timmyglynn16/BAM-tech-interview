@@ -10,6 +10,7 @@ export interface ApiResponse<T> {
   data?: T;
   people?: T;
   astronautDuties?: T;
+  astronauts?: T;
 }
 
 @Injectable({

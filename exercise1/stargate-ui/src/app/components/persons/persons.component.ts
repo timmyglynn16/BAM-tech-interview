@@ -49,7 +49,13 @@ import { UpdatePersonDialogComponent } from './update-person-dialog.component';
           <button mat-button (click)="loadPersons()">Retry</button>
         </div>
 
-        <table mat-table [dataSource]="filteredPersons" class="persons-table" *ngIf="!loading && !error">
+        <div *ngIf="!loading && !error && filteredPersons.length === 0" class="no-data-container">
+          <mat-icon>person_off</mat-icon>
+          <h3>No Persons Found</h3>
+          <p>No persons have been added yet.</p>
+        </div>
+
+        <table mat-table [dataSource]="filteredPersons" class="persons-table" *ngIf="!loading && !error && filteredPersons.length > 0">
         <ng-container matColumnDef="personId">
           <th mat-header-cell *matHeaderCellDef>ID</th>
           <td mat-cell *matCellDef="let person">
@@ -133,7 +139,7 @@ import { UpdatePersonDialogComponent } from './update-person-dialog.component';
     }
     
       
-      .loading-container, .error-container {
+      .loading-container, .error-container, .no-data-container {
         display: flex;
         flex-direction: column;
         align-items: center;
@@ -144,6 +150,28 @@ import { UpdatePersonDialogComponent } from './update-person-dialog.component';
       
       .error-container {
         color: #d32f2f;
+      }
+      
+      .no-data-container {
+        color: #666;
+      }
+      
+      .no-data-container mat-icon {
+        font-size: 4rem;
+        width: 4rem;
+        height: 4rem;
+        opacity: 0.5;
+      }
+      
+      .no-data-container h3 {
+        margin: 0;
+        font-size: 1.5rem;
+        font-weight: 400;
+      }
+      
+      .no-data-container p {
+        margin: 0;
+        opacity: 0.8;
       }
       
       @media (max-width: 768px) {
@@ -183,8 +211,8 @@ export class PersonsComponent implements OnInit {
         console.log('API Response:', response);
         this.loading = false;
         
-        if (response.people && Array.isArray(response.people)) {
-          this.persons = response.people;
+        if (response.success) {
+          this.persons = (response.people as Person[]) || [];
           this.filteredPersons = [...this.persons];
         } else {
           this.error = response.message || 'Failed to load persons';

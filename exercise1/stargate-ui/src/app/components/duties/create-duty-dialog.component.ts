@@ -61,16 +61,16 @@ import { PersonsService, Person } from '../../services/persons.service';
         <input matInput [(ngModel)]="dutyData.dutyTitle" placeholder="Enter duty title" required>
       </mat-form-field>
       
-      <mat-form-field appearance="outline" class="full-width" *ngIf="dutyData.dutyType === 'regular'">
+      <mat-form-field appearance="outline" class="full-width">
         <mat-label>Start Date</mat-label>
         <input matInput [matDatepicker]="startPicker" [(ngModel)]="dutyData.dutyStartDate" required>
         <mat-datepicker-toggle matSuffix [for]="startPicker"></mat-datepicker-toggle>
         <mat-datepicker #startPicker></mat-datepicker>
       </mat-form-field>
       
-      <mat-form-field appearance="outline" class="full-width" *ngIf="dutyData.dutyType === 'retired'">
-        <mat-label>End Date (Retirement Date)</mat-label>
-        <input matInput [matDatepicker]="endPicker" [(ngModel)]="dutyData.dutyEndDate" required>
+      <mat-form-field appearance="outline" class="full-width" *ngIf="dutyData.dutyType === 'regular'">
+        <mat-label>End Date (Optional)</mat-label>
+        <input matInput [matDatepicker]="endPicker" [(ngModel)]="dutyData.dutyEndDate">
         <mat-datepicker-toggle matSuffix [for]="endPicker"></mat-datepicker-toggle>
         <mat-datepicker #endPicker></mat-datepicker>
       </mat-form-field>
@@ -192,8 +192,8 @@ export class CreateDutyDialogComponent implements OnInit {
   onDutyTypeChange() {
     if (this.dutyData.dutyType === 'retired') {
       this.dutyData.dutyTitle = 'RETIRED';
-      this.dutyData.dutyEndDate = new Date(); // Auto-fill with today's date
-      this.dutyData.dutyStartDate = null; // Clear start date
+      this.dutyData.dutyStartDate = new Date(); // Set start date for retirement
+      this.dutyData.dutyEndDate = null; // No end date for retirement
     } else {
       this.dutyData.dutyTitle = '';
       this.dutyData.dutyEndDate = null; // Clear end date for regular duties
@@ -212,13 +212,13 @@ export class CreateDutyDialogComponent implements OnInit {
       dutyTitle: this.dutyData.dutyTitle
     };
 
-    // Add start date for regular duties
-    if (this.dutyData.dutyType === 'regular' && this.dutyData.dutyStartDate) {
+    // Add start date for all duties (including retirement)
+    if (this.dutyData.dutyStartDate) {
       result.dutyStartDate = this.dutyData.dutyStartDate.toISOString();
     }
 
-    // Add end date if it's a retirement
-    if (this.dutyData.dutyType === 'retired' && this.dutyData.dutyEndDate) {
+    // Add end date only for regular duties (not retirement)
+    if (this.dutyData.dutyType === 'regular' && this.dutyData.dutyEndDate) {
       result.dutyEndDate = this.dutyData.dutyEndDate.toISOString();
     }
 
@@ -228,13 +228,13 @@ export class CreateDutyDialogComponent implements OnInit {
   isFormValid(): boolean {
     const hasName = this.selectedPersonName.trim().length > 0;
     const hasRank = !!this.dutyData.rank;
+    const hasStartDate = !!this.dutyData.dutyStartDate;
     
     if (this.dutyData.dutyType === 'retired') {
-      // For retirement, only need name, rank, and end date (start date is not required)
-      return !!(hasName && hasRank && this.dutyData.dutyEndDate);
+      // For retirement, need name, rank, and start date (no end date)
+      return !!(hasName && hasRank && hasStartDate);
     } else {
       // For regular duties, need name, rank, start date, and duty title
-      const hasStartDate = !!this.dutyData.dutyStartDate;
       return !!(hasName && hasRank && hasStartDate && this.dutyData.dutyTitle.trim());
     }
   }

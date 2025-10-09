@@ -1,5 +1,6 @@
-import { Component } from '@angular/core';
+import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
 import { MatTableModule } from '@angular/material/table';
 import { MatCardModule } from '@angular/material/card';
 import { MatButtonModule } from '@angular/material/button';
@@ -7,13 +8,15 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatChipsModule } from '@angular/material/chips';
 import { MatInputModule } from '@angular/material/input';
 import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { AstronautsService, PersonAstronaut } from '../../services/astronauts.service';
 
 @Component({
   selector: 'app-astronauts',
   standalone: true,
   imports: [
-    CommonModule, MatTableModule, MatCardModule, MatButtonModule, 
-    MatIconModule, MatChipsModule, MatInputModule, MatFormFieldModule
+    CommonModule, FormsModule, MatTableModule, MatCardModule, MatButtonModule, 
+    MatIconModule, MatChipsModule, MatInputModule, MatFormFieldModule, MatProgressSpinnerModule
   ],
   template: `
     <div class="header">
@@ -23,11 +26,28 @@ import { MatFormFieldModule } from '@angular/material/form-field';
     <div class="card">
       <mat-form-field appearance="outline" class="search-field">
         <mat-label>Search astronauts</mat-label>
-        <input matInput placeholder="Name, rank, or specialization">
+        <input matInput placeholder="Name, rank, or duty title" [(ngModel)]="searchTerm" (input)="filterAstronauts()">
         <mat-icon matSuffix>search</mat-icon>
       </mat-form-field>
 
-      <table mat-table [dataSource]="astronauts" class="astronauts-table">
+      <div *ngIf="loading" class="loading-container">
+        <mat-spinner></mat-spinner>
+        <p>Loading astronauts...</p>
+      </div>
+
+      <div *ngIf="error" class="error-container">
+        <mat-icon color="warn">error</mat-icon>
+        <p>{{ error }}</p>
+        <button mat-button (click)="loadAstronauts()">Retry</button>
+      </div>
+
+      <div *ngIf="!loading && !error && filteredAstronauts.length === 0" class="no-data-container">
+        <mat-icon>person_off</mat-icon>
+        <h3>No Astronauts Found</h3>
+        <p>No astronauts have been assigned duties yet.</p>
+      </div>
+
+      <table mat-table [dataSource]="filteredAstronauts" class="astronauts-table" *ngIf="!loading && !error && filteredAstronauts.length > 0">
         <ng-container matColumnDef="personId">
           <th mat-header-cell *matHeaderCellDef>Person ID</th>
           <td mat-cell *matCellDef="let astronaut">
@@ -38,20 +58,19 @@ import { MatFormFieldModule } from '@angular/material/form-field';
         </ng-container>
 
         <ng-container matColumnDef="name">
-          <th mat-header-cell *matHeaderCellDef>Name (Person)</th>
+          <th mat-header-cell *matHeaderCellDef>Name</th>
           <td mat-cell *matCellDef="let astronaut">
             <div class="astronaut-info">
               <mat-icon>person</mat-icon>
               <div>
                 <div class="name">{{ astronaut.name }}</div>
-                <div class="source">From Person table</div>
               </div>
             </div>
           </td>
         </ng-container>
 
         <ng-container matColumnDef="currentRank">
-          <th mat-header-cell *matHeaderCellDef>Current Rank (AstronautDetail)</th>
+          <th mat-header-cell *matHeaderCellDef>Current Rank</th>
           <td mat-cell *matCellDef="let astronaut">
             <mat-chip color="primary" selected>
               {{ astronaut.currentRank }}
@@ -60,7 +79,7 @@ import { MatFormFieldModule } from '@angular/material/form-field';
         </ng-container>
 
         <ng-container matColumnDef="currentDutyTitle">
-          <th mat-header-cell *matHeaderCellDef>Current Duty (AstronautDetail)</th>
+          <th mat-header-cell *matHeaderCellDef>Current Duty</th>
           <td mat-cell *matCellDef="let astronaut">
             <div class="duty-title">
               {{ astronaut.currentDutyTitle }}
@@ -69,21 +88,21 @@ import { MatFormFieldModule } from '@angular/material/form-field';
         </ng-container>
 
         <ng-container matColumnDef="careerStartDate">
-          <th mat-header-cell *matHeaderCellDef>Career Start (AstronautDetail)</th>
+          <th mat-header-cell *matHeaderCellDef>Career Start</th>
           <td mat-cell *matCellDef="let astronaut">
             <div class="date-info">
               <mat-icon>calendar_today</mat-icon>
-              {{ astronaut.careerStartDate | date:'MMM yyyy' }}
+              {{ astronaut.careerStartDate | date:'MMM dd, yyyy' }}
             </div>
           </td>
         </ng-container>
 
         <ng-container matColumnDef="careerEndDate">
-          <th mat-header-cell *matHeaderCellDef>Career End (AstronautDetail)</th>
+          <th mat-header-cell *matHeaderCellDef>Career End</th>
           <td mat-cell *matCellDef="let astronaut">
             <div class="date-info" *ngIf="astronaut.careerEndDate; else activeStatus">
               <mat-icon>event_busy</mat-icon>
-              {{ astronaut.careerEndDate | date:'MMM yyyy' }}
+              {{ astronaut.careerEndDate | date:'MMM dd, yyyy' }}
             </div>
             <ng-template #activeStatus>
               <mat-chip color="accent" selected>Active</mat-chip>
@@ -138,11 +157,6 @@ import { MatFormFieldModule } from '@angular/material/form-field';
       font-size: 0.9rem;
     }
     
-    .source {
-      color: #666;
-      font-size: 0.8rem;
-      font-style: italic;
-    }
     
     .duty-title {
       font-weight: 500;
@@ -157,6 +171,41 @@ import { MatFormFieldModule } from '@angular/material/form-field';
       font-size: 0.9rem;
     }
     
+    .loading-container, .error-container, .no-data-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 16px;
+      padding: 40px;
+      text-align: center;
+    }
+    
+    .error-container {
+      color: #d32f2f;
+    }
+    
+    .no-data-container {
+      color: #666;
+    }
+    
+    .no-data-container mat-icon {
+      font-size: 4rem;
+      width: 4rem;
+      height: 4rem;
+      opacity: 0.5;
+    }
+    
+    .no-data-container h3 {
+      margin: 0;
+      font-size: 1.5rem;
+      font-weight: 400;
+    }
+    
+    .no-data-container p {
+      margin: 0;
+      opacity: 0.8;
+    }
+    
     @media (max-width: 768px) {
       .header {
         flex-direction: column;
@@ -166,54 +215,56 @@ import { MatFormFieldModule } from '@angular/material/form-field';
     }
   `]
 })
-export class AstronautsComponent {
+export class AstronautsComponent implements OnInit {
   displayedColumns: string[] = ['personId', 'name', 'currentRank', 'currentDutyTitle', 'careerStartDate', 'careerEndDate', 'actions'];
   
-  // This represents the join between Person and AstronautDetail tables
-  astronauts = [
-    {
-      // Person table fields
-      personId: 1,
-      name: 'Commander Sarah Chen',
-      
-      // AstronautDetail table fields
-      currentRank: 'Commander',
-      currentDutyTitle: 'Mission Commander',
-      careerStartDate: new Date('2015-03-15'),
-      careerEndDate: null
-    },
-    {
-      personId: 2,
-      name: 'Lt. Marcus Rodriguez',
-      currentRank: 'Lieutenant',
-      currentDutyTitle: 'Engineering Officer',
-      careerStartDate: new Date('2018-06-20'),
-      careerEndDate: null
-    },
-    {
-      personId: 3,
-      name: 'Dr. Elena Volkov',
-      currentRank: 'Doctor',
-      currentDutyTitle: 'Medical Officer',
-      careerStartDate: new Date('2020-01-10'),
-      careerEndDate: null
-    },
-    {
-      personId: 4,
-      name: 'Captain James Mitchell',
-      currentRank: 'Captain',
-      currentDutyTitle: 'Flight Director',
-      careerStartDate: new Date('2010-09-05'),
-      careerEndDate: new Date('2024-12-31')
-    },
-    {
-      personId: 5,
-      name: 'Lt. Commander Aisha Patel',
-      currentRank: 'Lt. Commander',
-      currentDutyTitle: 'Communications Officer',
-      careerStartDate: new Date('2016-11-12'),
-      careerEndDate: null
-    }
-  ];
+  astronauts: PersonAstronaut[] = [];
+  filteredAstronauts: PersonAstronaut[] = [];
+  loading = false;
+  error: string | null = null;
+  searchTerm = '';
 
+  constructor(private astronautsService: AstronautsService) {}
+
+  ngOnInit() {
+    this.loadAstronauts();
+  }
+
+  loadAstronauts() {
+    this.loading = true;
+    this.error = null;
+    
+    this.astronautsService.getAllAstronauts().subscribe({
+      next: (response) => {
+        console.log('All astronauts response:', response);
+        this.loading = false;
+        
+        if (response.success) {
+          this.astronauts = (response.astronauts as PersonAstronaut[]) || [];
+          this.filteredAstronauts = [...this.astronauts];
+        } else {
+          this.error = response.message || 'Failed to load astronauts';
+        }
+      },
+      error: (err) => {
+        this.loading = false;
+        this.error = 'Failed to load astronauts. Please check if the API is running.';
+        console.error('Error loading astronauts:', err);
+      }
+    });
+  }
+
+  filterAstronauts() {
+    let filtered = [...this.astronauts];
+
+    // Search filter
+    if (this.searchTerm.trim()) {
+      filtered = filtered.filter(astronaut =>
+        astronaut.name.toLowerCase().includes(this.searchTerm.toLowerCase()) ||
+        astronaut.currentRank.toLowerCase().includes(this.searchTerm.toLowerCase()) ||
+        astronaut.currentDutyTitle.toLowerCase().includes(this.searchTerm.toLowerCase())
+      );
+    }
+    this.filteredAstronauts = filtered;
+  }
 }

@@ -61,10 +61,18 @@ namespace StargateAPI.Business.Commands
         }
         public async Task<CreateAstronautDutyResult> Handle(CreateAstronautDuty request, CancellationToken cancellationToken)
         {
+            try
+            {
 
-            var query = "SELECT * FROM [Person] WHERE Name = @Name";
+
+                var query = "SELECT * FROM [Person] WHERE Name = @Name";
 
             var person = await _context.Connection.QueryFirstOrDefaultAsync<Person>(query, new { Name = request.Name });
+            
+            if (person == null)
+            {
+                throw new InvalidOperationException($"Person with name '{request.Name}' not found");
+            }
 
             query = "SELECT * FROM [AstronautDetail] WHERE PersonId = @PersonId";
 
@@ -77,21 +85,16 @@ namespace StargateAPI.Business.Commands
 
             if (astronautDuty != null)
             {
-                // Rule 5: Previous Duty End Date is set to the day before the New Astronaut Duty Start Date
-                DateTime newDutyStartDate;
-                if (request.DutyTitle == "RETIRED" && request.DutyEndDate.HasValue)
+                // For ALL duties (including retirement): previous duty ends one day before new duty starts
+                DateTime previousDutyEndDate;
+                
+                // Check if the start date is valid (not default DateTime)
+                if (request.DutyStartDate == default(DateTime))
                 {
-                    // For retirement, the new duty start date is the retirement date
-                    newDutyStartDate = request.DutyEndDate.Value.Date;
-                }
-                else
-                {
-                    // For regular duties, use the provided start date
-                    newDutyStartDate = request.DutyStartDate.Date;
+                    throw new InvalidOperationException("DutyStartDate is required for all duties but was not provided");
                 }
                 
-                // Rule 5: Set previous duty end date to one day before new duty start date
-                DateTime previousDutyEndDate = newDutyStartDate.AddDays(-1).Date;
+                previousDutyEndDate = request.DutyStartDate.AddDays(-1).Date;
                 
                 try
                 {
@@ -106,7 +109,7 @@ namespace StargateAPI.Business.Commands
                 }
                 catch (ArgumentOutOfRangeException ex)
                 {
-                    throw new InvalidOperationException($"Cannot calculate end date for duty. Existing duty start: {astronautDuty.DutyStartDate}, New duty start: {newDutyStartDate}, Error: {ex.Message}");
+                    throw new InvalidOperationException($"Cannot calculate end date for duty. Existing duty start: {astronautDuty.DutyStartDate}, Retirement date: {request.DutyEndDate}, Error: {ex.Message}");
                 }
             }
 
@@ -115,11 +118,11 @@ namespace StargateAPI.Business.Commands
                 PersonId = person.Id,
                 Rank = request.Rank,
                 DutyTitle = request.DutyTitle,
-                DutyStartDate = request.DutyTitle == "RETIRED" && request.DutyEndDate.HasValue 
-                    ? request.DutyEndDate.Value.Date 
-                    : request.DutyStartDate.Date,
-                DutyEndDate = request.DutyEndDate?.Date
+                DutyStartDate = request.DutyStartDate == default(DateTime) ? DateTime.Today : request.DutyStartDate.Date,
+                DutyEndDate = request.DutyTitle == "RETIRED" ? null : request.DutyEndDate?.Date  // No end date for retirement
             };
+
+            Console.WriteLine($"Creating new duty - Title: {newAstronautDuty.DutyTitle}, Start: {newAstronautDuty.DutyStartDate}, End: {newAstronautDuty.DutyEndDate}");
 
             await _context.AstronautDuties.AddAsync(newAstronautDuty);
 
@@ -130,10 +133,15 @@ namespace StargateAPI.Business.Commands
                 astronautDetail.PersonId = person.Id;
                 astronautDetail.CurrentDutyTitle = request.DutyTitle;
                 astronautDetail.CurrentRank = request.Rank;
-                astronautDetail.CareerStartDate = request.DutyStartDate.Date;
-                if (request.DutyTitle == "RETIRED" && request.DutyEndDate.HasValue)
+                
+                DateTime careerStartDate = request.DutyStartDate == default(DateTime) ? DateTime.Today : request.DutyStartDate.Date;
+                astronautDetail.CareerStartDate = careerStartDate;
+                
+                if (request.DutyTitle == "RETIRED")
                 {
-                    astronautDetail.CareerEndDate = request.DutyEndDate.Value.Date;
+                    // Career end date is one day before the retirement duty start date
+                    astronautDetail.CareerEndDate = careerStartDate.AddDays(-1);
+                    Console.WriteLine($"New AstronautDetail - Setting career end date to: {astronautDetail.CareerEndDate} (one day before retirement start: {careerStartDate})");
                 }
 
                 await _context.AstronautDetails.AddAsync(astronautDetail);
@@ -142,19 +150,27 @@ namespace StargateAPI.Business.Commands
             {
                 astronautDetail.CurrentDutyTitle = request.DutyTitle;
                 astronautDetail.CurrentRank = request.Rank;
-                if (request.DutyTitle == "RETIRED" && request.DutyEndDate.HasValue)
+                if (request.DutyTitle == "RETIRED")
                 {
-                    astronautDetail.CareerEndDate = request.DutyEndDate.Value.Date;
+                    // Career end date is one day before the retirement duty start date
+                    DateTime retirementStartDate = request.DutyStartDate == default(DateTime) ? DateTime.Today : request.DutyStartDate.Date;
+                    astronautDetail.CareerEndDate = retirementStartDate.AddDays(-1);
+                    Console.WriteLine($"Existing AstronautDetail - Setting career end date to: {astronautDetail.CareerEndDate} (one day before retirement start: {retirementStartDate})");
                 }
                 _context.AstronautDetails.Update(astronautDetail);
             }
 
             await _context.SaveChangesAsync();
 
-            return new CreateAstronautDutyResult()
+                return new CreateAstronautDutyResult()
+                {
+                    Id = newAstronautDuty.Id
+                };
+            }
+            catch (Exception)
             {
-                Id = newAstronautDuty.Id
-            };
+                throw;
+            }
         }
     }
 

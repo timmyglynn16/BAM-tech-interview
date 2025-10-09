@@ -77,13 +77,19 @@ interface DutyWithPerson {
         <p>Loading duties...</p>
       </div>
 
-      <div *ngIf="error" class="error-container">
-        <mat-icon color="warn">error</mat-icon>
-        <p>{{ error }}</p>
-        <button mat-button (click)="loadDuties()">Retry</button>
-      </div>
+            <div *ngIf="error" class="error-container">
+              <mat-icon color="warn">error</mat-icon>
+              <p>{{ error }}</p>
+              <button mat-button (click)="loadDuties()">Retry</button>
+            </div>
 
-      <table mat-table [dataSource]="filteredDuties" class="duties-table" *ngIf="!loading && !error">
+            <div *ngIf="!loading && !error && filteredDuties.length === 0" class="no-data-container">
+              <mat-icon>assignment_turned_in</mat-icon>
+              <h3>No Duties Found</h3>
+              <p>No duties have been assigned yet.</p>
+            </div>
+
+            <table mat-table [dataSource]="filteredDuties" class="duties-table" *ngIf="!loading && !error && filteredDuties.length > 0">
         <ng-container matColumnDef="dutyTitle">
           <th mat-header-cell *matHeaderCellDef>Duty Title</th>
           <td mat-cell *matCellDef="let duty">
@@ -244,7 +250,7 @@ interface DutyWithPerson {
       background-color: #ffcdd2;
     }
     
-    .loading-container, .error-container {
+    .loading-container, .error-container, .no-data-container {
       display: flex;
       flex-direction: column;
       align-items: center;
@@ -255,6 +261,28 @@ interface DutyWithPerson {
     
     .error-container {
       color: #d32f2f;
+    }
+    
+    .no-data-container {
+      color: #666;
+    }
+    
+    .no-data-container mat-icon {
+      font-size: 4rem;
+      width: 4rem;
+      height: 4rem;
+      opacity: 0.5;
+    }
+    
+    .no-data-container h3 {
+      margin: 0;
+      font-size: 1.5rem;
+      font-weight: 400;
+    }
+    
+    .no-data-container p {
+      margin: 0;
+      opacity: 0.8;
     }
     
     @media (max-width: 768px) {
@@ -294,9 +322,10 @@ export class DutiesComponent implements OnInit {
         console.log('All duties response:', response);
         this.loading = false;
         
-        if (response.success && response.astronautDuties) {
+        if (response.success) {
           const now = new Date();
-          this.duties = response.astronautDuties.map((duty: AstronautDutyWithPerson) => {
+          const dutiesData = (response.astronautDuties as AstronautDutyWithPerson[]) || [];
+          this.duties = dutiesData.map((duty: AstronautDutyWithPerson) => {
             const endDate = duty.dutyEndDate ? new Date(duty.dutyEndDate) : null;
             const isCompleted = endDate ? endDate < now : false;
             const isActive = !endDate || endDate >= now;
@@ -313,6 +342,9 @@ export class DutiesComponent implements OnInit {
               isCompleted
             };
           });
+          
+          // Sort by creation order (Id descending - most recently created first)
+          this.duties.sort((a, b) => b.id - a.id);
           
           this.filteredDuties = [...this.duties];
         } else {
@@ -367,8 +399,12 @@ export class DutiesComponent implements OnInit {
       name: dutyData.name,
       rank: dutyData.rank,
       dutyTitle: dutyData.dutyTitle,
-      dutyStartDate: dutyData.dutyStartDate
+      dutyStartDate: dutyData.dutyStartDate,
+      dutyEndDate: dutyData.dutyEndDate
     };
+
+    // Debug logging
+    console.log('Duties component sending request:', request);
 
     this.dutiesService.createDuty(request).subscribe({
       next: (response) => {
