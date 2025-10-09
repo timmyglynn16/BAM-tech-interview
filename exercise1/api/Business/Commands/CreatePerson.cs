@@ -3,11 +3,14 @@ using MediatR.Pipeline;
 using Microsoft.EntityFrameworkCore;
 using StargateAPI.Business.Data;
 using StargateAPI.Controllers;
+using System.ComponentModel.DataAnnotations;
 
 namespace StargateAPI.Business.Commands
 {
     public class CreatePerson : IRequest<CreatePersonResult>
     {
+        [Required(ErrorMessage = "Name is required")]
+        [MaxLength(255, ErrorMessage = "Name cannot exceed 255 characters")]
         public required string Name { get; set; } = string.Empty;
     }
 

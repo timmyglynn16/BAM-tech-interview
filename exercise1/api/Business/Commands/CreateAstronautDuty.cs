@@ -4,18 +4,26 @@ using MediatR.Pipeline;
 using Microsoft.EntityFrameworkCore;
 using StargateAPI.Business.Data;
 using StargateAPI.Controllers;
+using System.ComponentModel.DataAnnotations;
 using System.Net;
 
 namespace StargateAPI.Business.Commands
 {
     public class CreateAstronautDuty : IRequest<CreateAstronautDutyResult>
     {
+        [Required(ErrorMessage = "Name is required")]
+        [MaxLength(255, ErrorMessage = "Name cannot exceed 255 characters")]
         public required string Name { get; set; }
 
+        [Required(ErrorMessage = "Rank is required")]
+        [MaxLength(100, ErrorMessage = "Rank cannot exceed 100 characters")]
         public required string Rank { get; set; }
 
+        [Required(ErrorMessage = "DutyTitle is required")]
+        [MaxLength(100, ErrorMessage = "DutyTitle cannot exceed 100 characters")]
         public required string DutyTitle { get; set; }
 
+        [Required(ErrorMessage = "DutyStartDate is required")]
         public DateTime DutyStartDate { get; set; }
     }
 

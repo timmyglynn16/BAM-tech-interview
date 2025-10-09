@@ -43,6 +43,15 @@ namespace StargateAPI.Controllers
         [HttpGet("{name}")]
         public async Task<IActionResult> GetPersonByName(string name)
         {
+            if (string.IsNullOrWhiteSpace(name))
+            {
+                return this.GetResponse(new BaseResponse()
+                {
+                    Message = "Name parameter is required",
+                    Success = false,
+                    ResponseCode = (int)HttpStatusCode.BadRequest
+                });
+            }
             try
             {
                 var result = await _mediator.Send(new GetPersonByName()
@@ -66,6 +75,15 @@ namespace StargateAPI.Controllers
         [HttpPost("")]
         public async Task<IActionResult> CreatePerson([FromBody] string name)
         {
+            if (string.IsNullOrWhiteSpace(name))
+            {
+                return this.GetResponse(new BaseResponse()
+                {
+                    Message = "Name is required",
+                    Success = false,
+                    ResponseCode = (int)HttpStatusCode.BadRequest
+                });
+            }
             try
             {
                 var result = await _mediator.Send(new CreatePerson()

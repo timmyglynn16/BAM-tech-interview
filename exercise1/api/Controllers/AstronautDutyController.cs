@@ -19,6 +19,15 @@ namespace StargateAPI.Controllers
         [HttpGet("{name}")]
         public async Task<IActionResult> GetAstronautDutiesByName(string name)
         {
+            if (string.IsNullOrWhiteSpace(name))
+            {
+                return this.GetResponse(new BaseResponse()
+                {
+                    Message = "Name parameter is required",
+                    Success = false,
+                    ResponseCode = (int)HttpStatusCode.BadRequest
+                });
+            }
             try
             {
                 var result = await _mediator.Send(new GetAstronautDutiesByName()
@@ -42,6 +51,15 @@ namespace StargateAPI.Controllers
         [HttpPost("")]
         public async Task<IActionResult> CreateAstronautDuty([FromBody] CreateAstronautDuty request)
         {
+            if (request == null)
+            {
+                return this.GetResponse(new BaseResponse()
+                {
+                    Message = "Request body is required",
+                    Success = false,
+                    ResponseCode = (int)HttpStatusCode.BadRequest
+                });
+            }
             try
             {
                 var result = await _mediator.Send(request);
