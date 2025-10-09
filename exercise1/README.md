@@ -55,9 +55,9 @@ Examine the code, find and resolve any flaws, if any exist. Identify design patt
 ## Rules
 
 1. A Person is uniquely identified by their Name.
-1. A Person who has not had an astronaut assignment will not have Astronaut records.
-1. A Person will only ever hold one current Astronaut Duty Title, Start Date, and Rank at a time.
-1. A Person's Current Duty will not have a Duty End Date.
-1. A Person's Previous Duty End Date is set to the day before the New Astronaut Duty Start Date when a new Astronaut Duty is received for a Person.
-1. A Person is classified as 'Retired' when a Duty Title is 'RETIRED'.
-1. A Person's Career End Date is one day before the Retired Duty Start Date.
+2. A Person who has not had an astronaut assignment will not have Astronaut records.
+3. A Person will only ever hold one current Astronaut Duty Title, Start Date, and Rank at a time.
+4. A Person's Current Duty will not have a Duty End Date.
+5. A Person's Previous Duty End Date is set to the day before the New Astronaut Duty Start Date when a new Astronaut Duty is received for a Person.
+6. A Person is classified as 'Retired' when a Duty Title is 'RETIRED'.
+7. A Person's Career End Date is one day before the Retired Duty Start Date.
